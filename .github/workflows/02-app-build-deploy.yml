@@ -57,11 +57,35 @@ jobs:
         IMAGE_TAG: ${{ steps.get_image_tag.outputs.tag }}
       working-directory: ./app
       run: |
-        echo "Building image: $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$IMAGE_TAG"
-        docker buildx build --platform linux/amd64 -t $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$IMAGE_TAG --push .
-        # Output the full image URI
-        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
-        echo "Pushed image: $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$IMAGE_TAG"
+        echo "--- Debugging image URI components ---"
+        echo "ECR_REGISTRY: '$ECR_REGISTRY'"
+        echo "ECR_REPOSITORY_NAME: '$ECR_REPOSITORY_NAME'"
+        echo "IMAGE_TAG: '$IMAGE_TAG'"
+        
+        if [ -z "$ECR_REGISTRY" ] || [ -z "$ECR_REPOSITORY_NAME" ] || [ -z "$IMAGE_TAG" ]; then
+          echo "::error::One or more components for the image URI are empty."
+          echo "ECR_REGISTRY: $ECR_REGISTRY"
+          echo "ECR_REPOSITORY_NAME: $ECR_REPOSITORY_NAME"
+          echo "IMAGE_TAG: $IMAGE_TAG"
+          exit 1
+        fi
+
+        FULL_IMAGE_URI="$ECR_REGISTRY/$ECR_REPOSITORY_NAME:$IMAGE_TAG"
+        echo "Constructed FULL_IMAGE_URI: '$FULL_IMAGE_URI'"
+
+        if [ -z "$FULL_IMAGE_URI" ]; then
+          echo "::error::Constructed FULL_IMAGE_URI is empty."
+          exit 1
+        fi
+        
+        echo "Building image: $FULL_IMAGE_URI"
+        # Using buildx to specify platform, good for cross-architecture builds if needed
+        # Ensure your EKS nodes are amd64 if you build for amd64
+        docker buildx build --platform linux/amd64 -t "$FULL_IMAGE_URI" --push .
+        
+        # Output the full image URI for the next job
+        echo "image=$FULL_IMAGE_URI" >> $GITHUB_OUTPUT
+        echo "Pushed image: $FULL_IMAGE_URI"
 
   deploy-to-eks:
     name: Deploy to EKS
