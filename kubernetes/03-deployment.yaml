@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: wizapp-deployment
+  namespace: wizapp
+  labels:
+    app: wizapp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: wizapp
+  template:
+    metadata:
+      labels:
+        app: wizapp
+    spec:
+      # !! INTENTIONAL WEAKNESS: Uses 'default' ServiceAccount which is bound to cluster-admin via ClusterRoleBinding !!
+      # serviceAccountName: default # Explicitly stating default, or remove to use namespace default SA
+      containers:
+      - name: wizapp-container
+        # Replace with your ECR image URI. This will be updated by CI/CD.
+        # Example placeholder: [123456789012.dkr.ecr.us-east-1.amazonaws.com/wizexercise-app-repo:latest](https://123456789012.dkr.ecr.us-east-1.amazonaws.com/wizexercise-app-repo:latest)
+        #image: YOUR_AWS_ACCOUNT_ID.dkr.ecr.YOUR_AWS_[REGION.amazonaws.com/YOUR_ECR_REPO_NAME:latest](https://REGION.amazonaws.com/YOUR_ECR_REPO_NAME:latest) # Placeholder
+        image: 084375569241.dkr.ecr.us-east-1.amazonaws.com/wizexercise-app-repo:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000 # Port your application listens on (must match app/Dockerfile EXPOSE and app/server.js port)
+        env:
+        - name: MONGODB_URI
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: MONGODB_URI
+        # Add readiness and liveness probes for production-grade deployments
+        readinessProbe:
+          httpGet:
+            path: / # Your app's root or a specific health check endpoint
+            port: 3000
+          initialDelaySeconds: 20 # Give some time for the app to start
+          periodSeconds: 10
+          failureThreshold: 3
+        livenessProbe:
+          httpGet:
+            path: / # Your app's root or a specific health check endpoint
+            port: 3000
+          initialDelaySeconds: 45 # Longer delay for liveness
+          periodSeconds: 20
+          failureThreshold: 3
