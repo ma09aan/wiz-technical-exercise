@@ -84,7 +84,8 @@ jobs:
         docker buildx build --platform linux/amd64 -t "$FULL_IMAGE_URI" --push .
         
         # Output the full image URI for the next job
-        echo "image=$FULL_IMAGE_URI" >> $GITHUB_OUTPUT
+        #echo "image=$FULL_IMAGE_URI" >> $GITHUB_OUTPUT
+        echo "::set-output name=image::$FULL_IMAGE_URI"
         echo "Pushed image: $FULL_IMAGE_URI"
 
   deploy-to-eks:
