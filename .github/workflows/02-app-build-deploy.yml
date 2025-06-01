@@ -1,0 +1,113 @@
+name: 02 - Build and Deploy Application to EKS
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'app/**'
+      - 'kubernetes/**'
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  # Ensure PROJECT_NAME secret is set in GitHub repo settings, or hardcode here if preferred.
+  ECR_REPOSITORY_NAME: ${{ secrets.PROJECT_NAME }}-app-repo 
+  EKS_CLUSTER_NAME: ${{ secrets.PROJECT_NAME }}-eks-cluster 
+
+jobs:
+  build-and-push-image:
+    name: Build and Push Docker Image
+    runs-on: ubuntu-latest
+
+    outputs:
+      image_tag: ${{ steps.get_image_tag.outputs.tag }}
+      image_uri: ${{ steps.build-image.outputs.image }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Get Image Tag (Short SHA)
+      id: get_image_tag
+      run: echo "tag=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ steps.get_image_tag.outputs.tag }}
+      working-directory: ./app
+      run: |
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY_NAME:$IMAGE_TAG
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY_NAME:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+  deploy-to-eks:
+    name: Deploy to EKS
+    runs-on: ubuntu-latest
+    needs: build-and-push-image # Depends on the image being built
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Set up kubectl
+      uses: azure/setup-kubectl@v3
+      # with:
+      #   version: 'v1.27.0' # Specify your kubectl version
+
+    - name: Configure kubectl for EKS
+      env:
+        AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }} # Ensure AWS_ACCOUNT_ID is a GitHub secret
+      run: |
+        aws eks update-kubeconfig --region $AWS_REGION --name $EKS_CLUSTER_NAME
+        kubectl config get-contexts
+        kubectl config use-context arn:aws:eks:$AWS_REGION:$AWS_ACCOUNT_ID:cluster/$EKS_CLUSTER_NAME
+
+    - name: Update Kubernetes deployment with new image
+      run: |
+        echo "Using image: ${{ needs.build-and-push-image.outputs.image_uri }}"
+        # Update the image in your deployment.yaml.
+        # This can be done with yq, kustomize, or sed.
+        # Example with sed (ensure it's robust for your YAML structure):
+        # IMPORTANT: Replace placeholders in the sed command with actual values or use outputs from ECR build step.
+        # The image URI format is: <aws_account_id>.dkr.ecr.<aws_region>[.amazonaws.com/](https://.amazonaws.com/)<repository_name>:<tag>
+        # sed -i 's|image: YOUR_AWS_ACCOUNT_ID.dkr.ecr.YOUR_AWS_[REGION.amazonaws.com/YOUR_ECR_REPO_NAME:latest](https://REGION.amazonaws.com/YOUR_ECR_REPO_NAME:latest)|image: ${{ needs.build-and-push-image.outputs.image_uri }}|g' kubernetes/03-deployment.yaml
+        
+        # A more robust way using yq (you might need to install yq in the runner: `sudo apt-get install -y yq`)
+        # Ensure your deployment YAML path is correct
+        yq -i '.spec.template.spec.containers[0].image = "${{ needs.build-and-push-image.outputs.image_uri }}"' kubernetes/03-deployment.yaml
+
+
+    - name: Deploy to EKS cluster
+      run: |
+        kubectl apply -f kubernetes/01-namespace.yaml
+        # Ensure the secret data is correctly base64 encoded and the placeholder is replaced before applying
+        kubectl apply -f kubernetes/05-secret.yaml 
+        kubectl apply -f kubernetes/02-rbac-clusteradmin.yaml
+        kubectl apply -f kubernetes/03-deployment.yaml
+        kubectl apply -f kubernetes/04-service.yaml
+        echo "Waiting for deployment to rollout..."
+        kubectl rollout status deployment/wizapp-deployment -n wizapp --timeout=2m
+        echo "Application Load Balancer URL (may take a few minutes to become available):"
+        kubectl get svc wizapp-service -n wizapp -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || kubectl get svc wizapp-service -n wizapp -o jsonpath='{.status.loadBalancer.ingress[0].ip}'
+

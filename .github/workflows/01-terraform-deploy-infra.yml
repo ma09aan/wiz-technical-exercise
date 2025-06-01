@@ -1,0 +1,61 @@
+name: 01 - Deploy Infrastructure with Terraform
+
+on:
+  push:
+    branches:
+      - main # Or your default branch
+    paths:
+      - 'terraform/**'
+  workflow_dispatch: # Allows manual triggering
+
+jobs:
+  terraform:
+    name: 'Terraform Apply'
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: ${{ secrets.AWS_REGION }} # Set your AWS region
+      TF_VAR_db_password: ${{ secrets.DB_PASSWORD }} # Store DB password as a GitHub secret
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v2 
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: 1.5.0 # Specify your Terraform version
+
+    - name: Terraform Init
+      id: init
+      run: terraform init
+      working-directory: ./terraform
+      # If using S3 backend:
+      # run: terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" -backend-config="key=wiz-exercise/terraform.tfstate" -backend-config="region=${{ env.AWS_REGION }}" -backend-config="dynamodb_table=${{ secrets.TF_STATE_LOCK_TABLE }}"
+
+    - name: Terraform Validate
+      id: validate
+      run: terraform validate -no-color
+      working-directory: ./terraform
+
+    - name: Terraform Plan
+      id: plan
+      run: terraform plan -no-color -var="db_password=${{ secrets.DB_PASSWORD }}" -out=tfplan
+      working-directory: ./terraform
+      continue-on-error: true # Optional: if you want to see plan even if it fails
+
+    - name: Terraform Plan Status
+      if: steps.plan.outcome == 'failure'
+      run: exit 1
+
+    - name: Terraform Apply
+      if: github.ref == 'refs/heads/main' && steps.plan.outcome == 'success' # Apply only on main branch and if plan succeeds
+      run: terraform apply -auto-approve tfplan
+      working-directory: ./terraform
+
