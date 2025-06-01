@@ -1,3 +1,6 @@
+iam-remove.sh
+non-default.sh
+remove.sh
 terraform/.terraform/
 # Terraform
 **/.terraform/
