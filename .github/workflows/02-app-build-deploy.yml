@@ -84,8 +84,10 @@ jobs:
         docker buildx build --platform linux/amd64 -t "$FULL_IMAGE_URI" --push .
         
         # Output the full image URI for the next job
-        echo "Setting step output 'image' to: $FULL_IMAGE_URI"
-        echo "image=$FULL_IMAGE_URI" >> $GITHUB_OUTPUT # This sets steps.build-image.outputs.image
+        # Set the step output using the verified variable
+        echo "Setting step output 'image' to: '$TEMP_FULL_IMAGE_URI'"
+        echo "image=$TEMP_FULL_IMAGE_URI" >> "$GITHUB_OUTPUT" # Quoted GITHUB_OUTPUT for safety
+
         echo "Pushed image: $FULL_IMAGE_URI"
 
     - name: Verify step output in build-and-push-image job
