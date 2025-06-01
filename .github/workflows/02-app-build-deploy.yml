@@ -35,7 +35,7 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Configure AWS Credentials
-      uses: aws-actions/configure-aws-credentials@v4 # Updated to v4
+      uses: aws-actions/configure-aws-credentials@v4 
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -43,23 +43,23 @@ jobs:
 
     - name: Login to Amazon ECR
       id: login-ecr
-      uses: aws-actions/amazon-ecr-login@v2 # Updated to v2
+      uses: aws-actions/amazon-ecr-login@v2
 
     - name: Get Image Tag (Short SHA)
       id: get_image_tag
       run: echo "tag=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
     - name: Build, tag, and push image to Amazon ECR
-      id: build-image
+      id: build-image # This is the step ID
       env:
         ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         # ECR_REPOSITORY_NAME is taken from the job's env context
         IMAGE_TAG: ${{ steps.get_image_tag.outputs.tag }}
       working-directory: ./app
       run: |
-        echo "--- Debugging image URI components ---"
+        echo "--- Debugging image URI components (build-and-push-image job) ---"
         echo "ECR_REGISTRY: '$ECR_REGISTRY'"
-        echo "ECR_REPOSITORY_NAME: '$ECR_REPOSITORY_NAME'"
+        echo "ECR_REPOSITORY_NAME: '$ECR_REPOSITORY_NAME'" # This uses the job-level env var
         echo "IMAGE_TAG: '$IMAGE_TAG'"
         
         if [ -z "$ECR_REGISTRY" ] || [ -z "$ECR_REPOSITORY_NAME" ] || [ -z "$IMAGE_TAG" ]; then
@@ -84,9 +84,15 @@ jobs:
         docker buildx build --platform linux/amd64 -t "$FULL_IMAGE_URI" --push .
         
         # Output the full image URI for the next job
-        echo "image=$FULL_IMAGE_URI" >> $GITHUB_OUTPUT
-        #echo "::set-output name=image::$FULL_IMAGE_URI"
+        echo "Setting step output 'image' to: $FULL_IMAGE_URI"
+        echo "image=$FULL_IMAGE_URI" >> $GITHUB_OUTPUT # This sets steps.build-image.outputs.image
         echo "Pushed image: $FULL_IMAGE_URI"
+
+    - name: Verify step output in build-and-push-image job
+      if: always() # Run this step even if previous steps fail, to see the output value
+      run: |
+        echo "Verifying step output within 'build-and-push-image' job..."
+        echo "Value of 'steps.build-image.outputs.image' is: '${{ steps.build-image.outputs.image }}'"
 
   deploy-to-eks:
     name: Deploy to EKS
@@ -121,11 +127,15 @@ jobs:
         kubectl config get-contexts
 
     - name: Update Kubernetes deployment with new image
-      env:
-        IMAGE_URI_FROM_BUILD: ${{ needs.build-and-push-image.outputs.image_uri }}
+      # env: # No longer setting IMAGE_URI_FROM_BUILD as env here, will use direct shell assignment
+      #   IMAGE_URI_FROM_BUILD: ${{ needs.build-and-push-image.outputs.image_uri }}
       run: |
+        echo "--- Debugging received outputs (deploy-to-eks job) ---"
+        echo "Entire 'needs' context: ${{ toJson(needs) }}"
+        echo "Outputs from 'build-and-push-image' job: ${{ toJson(needs.build-and-push-image.outputs) }}"
+        
         IMAGE_URI_FROM_BUILD="${{ needs.build-and-push-image.outputs.image_uri }}"
-        echo "Attempting to use Image URI from build step: '$IMAGE_URI_FROM_BUILD'"
+        echo "Attempting to use Image URI from build step ('needs.build-and-push-image.outputs.image_uri'): '$IMAGE_URI_FROM_BUILD'"
 
         if [ -z "$IMAGE_URI_FROM_BUILD" ]; then
           echo "::error::Image URI from build step is empty. Cannot update deployment."
@@ -146,8 +156,12 @@ jobs:
           if grep -q "$PLACEHOLDER_TEXT" "$DEPLOYMENT_FILE"; then
             echo "::error::Placeholder text still found in $DEPLOYMENT_FILE after sed. Replacement failed."
             exit 1
-          elif ! grep -q "image: ${IMAGE_URI_FROM_BUILD}" "$DEPLOYMENT_FILE"; then
-            echo "::error::New image URI not found in $DEPLOYMENT_FILE after sed. Replacement failed."
+          elif ! grep -q "image: ${IMAGE_URI_FROM_BUILD}" "$DEPLOYMENT_FILE"; then # Check if the exact new URI is there
+            echo "::error::New image URI '$IMAGE_URI_FROM_BUILD' not found in $DEPLOYMENT_FILE after sed. Replacement failed or URI has special chars."
+            # Add this for more insight if the above fails:
+            echo "Looking for parts of the URI:"
+            grep "${{ env.ECR_REPOSITORY_NAME }}" "$DEPLOYMENT_FILE" || echo "Repo name not found"
+            grep "${{ needs.build-and-push-image.outputs.image_tag }}" "$DEPLOYMENT_FILE" || echo "Tag not found"
             exit 1
           else
             echo "Image URI successfully updated in $DEPLOYMENT_FILE."
@@ -156,8 +170,6 @@ jobs:
           echo "::warning::Placeholder text '$PLACEHOLDER_TEXT' not found in $DEPLOYMENT_FILE. Checking if image is already updated or if placeholder is different."
           # If the placeholder is not found, it might be okay if the image was already updated by a previous run
           # or if the placeholder in the committed file is different. This check prevents unnecessary failure.
-          # For this exercise, if it's not found, we'll assume it's okay or was already updated.
-          # In a production pipeline, you might want stricter checks or different logic.
         fi
 
     - name: Deploy to EKS cluster
