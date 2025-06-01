@@ -15,16 +15,15 @@ spec:
       labels:
         app: wizapp
     spec:
-      # !! INTENTIONAL WEAKNESS: Assign cluster-admin ServiceAccount (or default with ClusterRoleBinding) !!
-      # serviceAccountName: wizapp-sa # If you create a specific SA
+      # !! INTENTIONAL WEAKNESS: Uses 'default' ServiceAccount which is bound to cluster-admin via ClusterRoleBinding !!
+      # serviceAccountName: default 
       containers:
       - name: wizapp-container
-        # This will be dynamically replaced by the CI/CD pipeline.
-        # Example of what it might look like after replacement:
-        # image: 123456789012.dkr.ecr.us-east-1.amazonaws.com/wizexercise-app-repo:abcdef1
-        image: DYNAMICALLY_REPLACED_BY_CI_CD_PIPELINE # E.g., 123456789012.dkr.ecr.us-east-1.amazonaws.com/wizexercise-app-repo:commitsha
+        # This placeholder will be replaced by the CI/CD pipeline with the actual ECR image URI.
+        # Example after replacement: image: [123456789012.dkr.ecr.us-east-1.amazonaws.com/wizexercise-app-repo:abcdef1](https://123456789012.dkr.ecr.us-east-1.amazonaws.com/wizexercise-app-repo:abcdef1)
+        image: DYNAMICALLY_REPLACED_BY_CI_CD_PIPELINE # This exact string is targeted by sed in CI/CD
         ports:
-        - containerPort: 3000 # Port your application listens on
+        - containerPort: 3000 # Port your application listens on (must match app/Dockerfile EXPOSE and app/server.js port)
         env:
         - name: MONGODB_URI
           valueFrom:
@@ -34,13 +33,15 @@ spec:
         # Add readiness and liveness probes for production-grade deployments
         readinessProbe:
           httpGet:
-            path: / # Or an actual health check endpoint
+            path: / # Your app's root or a specific health check endpoint
             port: 3000
-          initialDelaySeconds: 15
+          initialDelaySeconds: 20 # Give some time for the app to start
           periodSeconds: 10
+          failureThreshold: 3
         livenessProbe:
           httpGet:
-            path: / # Or an actual health check endpoint
+            path: / # Your app's root or a specific health check endpoint
             port: 3000
-          initialDelaySeconds: 30
+          initialDelaySeconds: 45 # Longer delay for liveness
           periodSeconds: 20
+          failureThreshold: 3
