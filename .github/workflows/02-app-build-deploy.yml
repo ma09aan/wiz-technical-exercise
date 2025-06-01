@@ -128,50 +128,69 @@ jobs:
         echo "Available contexts:"
         kubectl config get-contexts
 
-    - name: Update Kubernetes deployment with new image
-      # env: # No longer setting IMAGE_URI_FROM_BUILD as env here, will use direct shell assignment
-      #   IMAGE_URI_FROM_BUILD: ${{ needs.build-and-push-image.outputs.image_uri }}
+- name: Update Kubernetes deployment with new image
+      env:
+        # Get the ECR registry URI. This assumes the login step ID is 'login-ecr' from the first job.
+        # However, we can't directly access steps from a 'needs' job this way.
+        # We need to reconstruct ECR_REGISTRY or pass it as an output too.
+        # For simplicity, let's reconstruct it using AWS_ACCOUNT_ID, AWS_REGION.
+        AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }} # Make sure this secret is set
+        IMAGE_TAG_FROM_BUILD: ${{ needs.build-and-push-image.outputs.image_tag }}
       run: |
-        echo "--- Debugging received outputs (deploy-to-eks job) ---"
-        echo "Entire 'needs' context: ${{ toJson(needs) }}"
-        echo "Outputs from 'build-and-push-image' job: ${{ toJson(needs.build-and-push-image.outputs) }}"
-        
-        IMAGE_URI_FROM_BUILD="${{ needs.build-and-push-image.outputs.image_uri }}"
-        echo "Attempting to use Image URI from build step ('needs.build-and-push-image.outputs.image_uri'): '$IMAGE_URI_FROM_BUILD'"
+        echo "--- Reconstructing Image URI in deploy-to-eks job ---"
+        echo "Received image_tag: '$IMAGE_TAG_FROM_BUILD'"
+        echo "Using ECR_REPOSITORY_NAME (from job env): '$ECR_REPOSITORY_NAME'"
+        echo "Using AWS_REGION (from job env): '$AWS_REGION'"
+        echo "Using AWS_ACCOUNT_ID (from step env): '$AWS_ACCOUNT_ID'"
 
-        if [ -z "$IMAGE_URI_FROM_BUILD" ]; then
-          echo "::error::Image URI from build step is empty. Cannot update deployment."
+        if [ -z "$IMAGE_TAG_FROM_BUILD" ]; then
+          echo "::error::Image tag from build step is empty."
+          exit 1
+        fi
+        if [ -z "$ECR_REPOSITORY_NAME" ]; then
+          echo "::error::ECR_REPOSITORY_NAME (job env) is empty. Check PROJECT_NAME secret."
+          exit 1
+        fi
+        if [ -z "$AWS_REGION" ]; then
+          echo "::error::AWS_REGION (job env) is empty. Check AWS_REGION secret."
+          exit 1
+        fi
+        if [ -z "$AWS_ACCOUNT_ID" ]; then
+          echo "::error::AWS_ACCOUNT_ID (step env from secret) is empty. Check AWS_ACCOUNT_ID secret."
+          exit 1
+        fi
+
+        # Reconstruct the ECR Registry part
+        ECR_REGISTRY_RECONSTRUCTED="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
+        echo "Reconstructed ECR Registry: '$ECR_REGISTRY_RECONSTRUCTED'"
+
+        ACTUAL_IMAGE_URI="$ECR_REGISTRY_RECONSTRUCTED/$ECR_REPOSITORY_NAME:$IMAGE_TAG_FROM_BUILD"
+        echo "Reconstructed ACTUAL_IMAGE_URI: '$ACTUAL_IMAGE_URI'"
+
+        if [ -z "$ACTUAL_IMAGE_URI" ]; then
+          echo "::error::Reconstructed ACTUAL_IMAGE_URI is empty. Cannot update deployment."
           exit 1
         fi
         
         DEPLOYMENT_FILE="kubernetes/03-deployment.yaml"
-        PLACEHOLDER_TEXT="image: DYNAMICALLY_REPLACED_BY_CI_CD_PIPELINE" # Ensure this matches your YAML
+        PLACEHOLDER_TEXT="image: DYNAMICALLY_REPLACED_BY_CI_CD_PIPELINE"
 
         echo "Updating $DEPLOYMENT_FILE..."
-        # Use a different delimiter for sed if IMAGE_URI_FROM_BUILD contains slashes (which it will)
-        # Check if the placeholder exists before attempting to replace
         if grep -q "$PLACEHOLDER_TEXT" "$DEPLOYMENT_FILE"; then
-          sed -i "s#${PLACEHOLDER_TEXT}.*#image: ${IMAGE_URI_FROM_BUILD}#g" "$DEPLOYMENT_FILE"
+          sed -i "s#${PLACEHOLDER_TEXT}.*#image: ${ACTUAL_IMAGE_URI}#g" "$DEPLOYMENT_FILE"
           echo "$DEPLOYMENT_FILE after sed replacement:"
           cat "$DEPLOYMENT_FILE"
-          # Verify the replacement worked
           if grep -q "$PLACEHOLDER_TEXT" "$DEPLOYMENT_FILE"; then
-            echo "::error::Placeholder text still found in $DEPLOYMENT_FILE after sed. Replacement failed."
+            echo "::error::Placeholder text still found after sed. Replacement failed."
             exit 1
-          elif ! grep -q "image: ${IMAGE_URI_FROM_BUILD}" "$DEPLOYMENT_FILE"; then # Check if the exact new URI is there
-            echo "::error::New image URI '$IMAGE_URI_FROM_BUILD' not found in $DEPLOYMENT_FILE after sed. Replacement failed or URI has special chars."
-            # Add this for more insight if the above fails:
-            echo "Looking for parts of the URI:"
-            grep "${{ env.ECR_REPOSITORY_NAME }}" "$DEPLOYMENT_FILE" || echo "Repo name not found"
-            grep "${{ needs.build-and-push-image.outputs.image_tag }}" "$DEPLOYMENT_FILE" || echo "Tag not found"
+          elif ! grep -q "image: ${ACTUAL_IMAGE_URI}" "$DEPLOYMENT_FILE"; then
+            echo "::error::New image URI not found after sed. Replacement failed. URI: '${ACTUAL_IMAGE_URI}'"
             exit 1
           else
             echo "Image URI successfully updated in $DEPLOYMENT_FILE."
           fi
         else
-          echo "::warning::Placeholder text '$PLACEHOLDER_TEXT' not found in $DEPLOYMENT_FILE. Checking if image is already updated or if placeholder is different."
-          # If the placeholder is not found, it might be okay if the image was already updated by a previous run
-          # or if the placeholder in the committed file is different. This check prevents unnecessary failure.
+          echo "::warning::Placeholder text '$PLACEHOLDER_TEXT' not found in $DEPLOYMENT_FILE."
         fi
 
     - name: Deploy to EKS cluster
