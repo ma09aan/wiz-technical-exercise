@@ -35,6 +35,9 @@ resource "aws_s3_bucket_policy" "backup_bucket_public_policy" {
       }
     ]
   })
+  depends_on = [
+    aws_s3_bucket_public_access_block.backup_bucket_access_block
+  ]
 }
 
 resource "aws_s3_bucket_public_access_block" "backup_bucket_access_block" {
