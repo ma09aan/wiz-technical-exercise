@@ -59,7 +59,7 @@ jobs:
       run: |
         echo "--- Debugging image URI components (build-and-push-image job) ---"
         echo "ECR_REGISTRY: '$ECR_REGISTRY'"
-        echo "ECR_REPOSITORY_NAME: '$ECR_REPOSITORY_NAME'" # This uses the job-level env var
+        echo "ECR_REPOSITORY_NAME: '$ECR_REPOSITORY_NAME'"
         echo "IMAGE_TAG: '$IMAGE_TAG'"
         
         if [ -z "$ECR_REGISTRY" ] || [ -z "$ECR_REPOSITORY_NAME" ] || [ -z "$IMAGE_TAG" ]; then
@@ -79,14 +79,10 @@ jobs:
         fi
         
         echo "Building image: $FULL_IMAGE_URI"
-        # Using buildx to specify platform, good for cross-architecture builds if needed
-        # Ensure your EKS nodes are amd64 if you build for amd64
         docker buildx build --platform linux/amd64 -t "$FULL_IMAGE_URI" --push .
         
-        # Output the full image URI for the next job
-        # Set the step output using the verified variable
-        echo "Setting step output 'image' to: '$TEMP_FULL_IMAGE_URI'"
-        echo "image=$TEMP_FULL_IMAGE_URI" >> "$GITHUB_OUTPUT" # Quoted GITHUB_OUTPUT for safety
+        echo "Setting step output 'image' to: '$FULL_IMAGE_URI'"
+        echo "image=$FULL_IMAGE_URI" >> "$GITHUB_OUTPUT" # Quoted GITHUB_OUTPUT for safety
 
         echo "Pushed image: $FULL_IMAGE_URI"
 
@@ -128,25 +124,22 @@ jobs:
         echo "Available contexts:"
         kubectl config get-contexts
 
-- name: Update Kubernetes deployment with new image
+    - name: Update Kubernetes deployment with new image # CORRECTED INDENTATION HERE
       env:
-        # Get the ECR registry URI. This assumes the login step ID is 'login-ecr' from the first job.
-        # However, we can't directly access steps from a 'needs' job this way.
-        # We need to reconstruct ECR_REGISTRY or pass it as an output too.
-        # For simplicity, let's reconstruct it using AWS_ACCOUNT_ID, AWS_REGION.
-        AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }} # Make sure this secret is set
+        AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }} 
         IMAGE_TAG_FROM_BUILD: ${{ needs.build-and-push-image.outputs.image_tag }}
       run: |
         echo "--- Reconstructing Image URI in deploy-to-eks job ---"
         echo "Received image_tag: '$IMAGE_TAG_FROM_BUILD'"
-        echo "Using ECR_REPOSITORY_NAME (from job env): '$ECR_REPOSITORY_NAME'"
-        echo "Using AWS_REGION (from job env): '$AWS_REGION'"
+        echo "Using ECR_REPOSITORY_NAME (from job env): '$ECR_REPOSITORY_NAME'" # Job env ECR_REPOSITORY_NAME
+        echo "Using AWS_REGION (from job env): '$AWS_REGION'" # Job env AWS_REGION
         echo "Using AWS_ACCOUNT_ID (from step env): '$AWS_ACCOUNT_ID'"
 
         if [ -z "$IMAGE_TAG_FROM_BUILD" ]; then
           echo "::error::Image tag from build step is empty."
           exit 1
         fi
+        # ECR_REPOSITORY_NAME and AWS_REGION are available from the job's 'env' block
         if [ -z "$ECR_REPOSITORY_NAME" ]; then
           echo "::error::ECR_REPOSITORY_NAME (job env) is empty. Check PROJECT_NAME secret."
           exit 1
@@ -160,7 +153,6 @@ jobs:
           exit 1
         fi
 
-        # Reconstruct the ECR Registry part
         ECR_REGISTRY_RECONSTRUCTED="$AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com"
         echo "Reconstructed ECR Registry: '$ECR_REGISTRY_RECONSTRUCTED'"
 
@@ -197,7 +189,6 @@ jobs:
       run: |
         echo "Applying Kubernetes manifests..."
         kubectl apply -f kubernetes/01-namespace.yaml
-        # Ensure the secret data is correctly base64 encoded and the placeholder is replaced before applying
         kubectl apply -f kubernetes/05-secret.yaml 
         kubectl apply -f kubernetes/02-rbac-clusteradmin.yaml
         kubectl apply -f kubernetes/03-deployment.yaml
@@ -207,7 +198,6 @@ jobs:
         kubectl rollout status deployment/wizapp-deployment -n wizapp --timeout=3m
         
         echo "Application Load Balancer URL (may take a few minutes to become available):"
-        # Attempt to get hostname, fall back to IP if hostname is not available
         LB_ADDRESS=$(kubectl get svc wizapp-service -n wizapp -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' || kubectl get svc wizapp-service -n wizapp -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
         echo "Load Balancer Address: $LB_ADDRESS"
         if [ -z "$LB_ADDRESS" ]; then
