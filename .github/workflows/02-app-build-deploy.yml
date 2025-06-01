@@ -84,8 +84,8 @@ jobs:
         docker buildx build --platform linux/amd64 -t "$FULL_IMAGE_URI" --push .
         
         # Output the full image URI for the next job
-        #echo "image=$FULL_IMAGE_URI" >> $GITHUB_OUTPUT
-        echo "::set-output name=image::$FULL_IMAGE_URI"
+        echo "image=$FULL_IMAGE_URI" >> $GITHUB_OUTPUT
+        #echo "::set-output name=image::$FULL_IMAGE_URI"
         echo "Pushed image: $FULL_IMAGE_URI"
 
   deploy-to-eks:
@@ -121,8 +121,10 @@ jobs:
         kubectl config get-contexts
 
     - name: Update Kubernetes deployment with new image
+      env:
+          IMAGE_URI_FROM_BUILD: ${{ needs.build-and-push-image.outputs.image_uri }}
       run: |
-        IMAGE_URI_FROM_BUILD="${{ needs.build-and-push-image.outputs.image_uri }}"
+        #IMAGE_URI_FROM_BUILD="${{ needs.build-and-push-image.outputs.image_uri }}"
         echo "Attempting to use Image URI from build step: '$IMAGE_URI_FROM_BUILD'"
 
         if [ -z "$IMAGE_URI_FROM_BUILD" ]; then
