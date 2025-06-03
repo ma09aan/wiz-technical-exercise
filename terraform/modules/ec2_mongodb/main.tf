@@ -39,8 +39,12 @@ resource "aws_instance" "mongodb_server" {
   associate_public_ip_address = true # Since it's in a public subnet for SSH access as per exercise
 
   # User data to install outdated MongoDB, configure it, and set up backups
-  user_data = templatefile("${path.module}/user_data/install_mongodb.sh", {
-    DB_USERNAME         = var.db_username
+  user_data = templatefile("${path.module}/user_data/install_mongodb.sh", {    #     Loads a user_data shell script with injected variables. Runs on first boot.
+
+# Injected into the shell script via template placeholders (${} inside the script).
+These are used for MongoDB credentials, config path, S3 backup, and region.
+
+    DB_USERNAME         = var.db_username 
     DB_PASSWORD         = var.db_password
     S3_BACKUP_BUCKET    = var.s3_backup_bucket_name
     AWS_REGION          = var.aws_region
@@ -48,7 +52,7 @@ resource "aws_instance" "mongodb_server" {
     MONGOD_CONF_PATH    = "/etc/mongod.conf"
     
   })
-user_data_replace_on_change = true
+user_data_replace_on_change = true # Replaces EC2 instance if the user_data script content changes — ensures config stays fresh.
 
   tags = {
     Name = "${var.project_name}-mongodb-server"
