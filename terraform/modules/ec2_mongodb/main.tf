@@ -3,6 +3,9 @@
 # Data source to find an AMI if mongodb_ami_id is not provided.
 # This example looks for a generic Amazon Linux 2 AMI.
 # You MUST adjust this or provide a specific var.mongodb_ami_id for an OUTDATED version.
+
+# Finds the latest Amazon Linux 2 AMI if no AMI ID is explicitly provided.
+
 data "aws_ami" "selected_ami" {
   count = var.mongodb_ami_id == "" ? 1 : 0 # Only run if mongodb_ami_id is not set
 
@@ -22,6 +25,9 @@ data "aws_ami" "selected_ami" {
     values = ["x86_64"]
   }
 }
+
+
+# Launches an EC2 instance for MongoDB using the provided or looked-up AMI, with configuration done via user_data.
 
 resource "aws_instance" "mongodb_server" {
   ami                         = var.mongodb_ami_id != "" ? var.mongodb_ami_id : data.aws_ami.selected_ami[0].id
