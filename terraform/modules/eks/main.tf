@@ -4,7 +4,7 @@
 # [https://registry.terraform.io/modules/terraform-aws-modules/eks/aws/latest](https://registry.terraform.io/modules/terraform-aws-modules/eks/aws/latest)
 
 resource "aws_eks_cluster" "main" {
-  name     = "${var.project_name}-eks-cluster"
+  name     = "${var.project_name}-eks-cluster" # Named\\\ the cluster using a project prefix (e.g., myapp-eks-cluster
   role_arn = var.eks_cluster_role_arn
   version  = var.eks_cluster_version # e.g., "1.27"
 
