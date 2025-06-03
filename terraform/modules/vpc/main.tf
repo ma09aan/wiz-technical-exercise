@@ -1,4 +1,6 @@
 # ./modules/vpc/main.tf
+# Create a new VPC with DNS support and a custom CIDR block.
+
 resource "aws_vpc" "main" {
   cidr_block           = var.vpc_cidr
   enable_dns_hostnames = true
@@ -8,12 +10,16 @@ resource "aws_vpc" "main" {
   }
 }
 
+# Attach an Internet Gateway to the VPC for public internet 
+
 resource "aws_internet_gateway" "gw" {
   vpc_id = aws_vpc.main.id
   tags = {
     Name = "${var.project_name}-igw"
   }
 }
+
+# Create public subnets with auto-assigned public IPs in specified AZs
 
 resource "aws_subnet" "public" {
   count                   = length(var.public_subnet_cidrs)
@@ -26,6 +32,8 @@ resource "aws_subnet" "public" {
   }
 }
 
+# Creat private subnets without public IPs in specified AZs
+
 resource "aws_subnet" "private" {
   count                   = length(var.private_subnet_cidrs)
   vpc_id                  = aws_vpc.main.id
@@ -37,6 +45,8 @@ resource "aws_subnet" "private" {
   }
 }
 
+# Create a route table that routes 0.0.0.0/0 via the Internet Gateway.
+
 resource "aws_route_table" "public" {
   vpc_id = aws_vpc.main.id
   route {
@@ -46,19 +56,26 @@ resource "aws_route_table" "public" {
   tags = { Name = "${var.project_name}-public-rt" }
 }
 
+# Associate each public subnet with the public route table 
+
 resource "aws_route_table_association" "public" {
   count          = length(aws_subnet.public)
   subnet_id      = aws_subnet.public[count.index].id
   route_table_id = aws_route_table.public.id
 }
 
+# Allocate an Elastic IP for NAT Gateway (only if private subnets exist).
+
 # NAT Gateway for private subnets (if EKS nodes need outbound internet for image pulls etc.)
+
 resource "aws_eip" "nat" {
   count = length(var.private_subnet_cidrs) > 0 ? 1 : 0 # Create only if private subnets exist
   # vpc   = true # For VPC EIP, use domain = "vpc" in newer provider versions
   domain = "vpc"
   tags  = { Name = "${var.project_name}-nat-eip" }
 }
+
+# Create a NAT Gateway in a public subnet using the allocated EIP
 
 resource "aws_nat_gateway" "nat" {
   count         = length(var.private_subnet_cidrs) > 0 ? 1 : 0
@@ -67,6 +84,8 @@ resource "aws_nat_gateway" "nat" {
   tags = { Name = "${var.project_name}-nat-gw" }
   depends_on = [aws_internet_gateway.gw]
 }
+
+# Create a private route table that routes internet-bound traffic via NAT.
 
 resource "aws_route_table" "private" {
   count  = length(var.private_subnet_cidrs) > 0 ? 1 : 0
@@ -78,11 +97,15 @@ resource "aws_route_table" "private" {
   tags = { Name = "${var.project_name}-private-rt" }
 }
 
+# Associate each private subnet with the private route table.
+
 resource "aws_route_table_association" "private" {
   count          = length(aws_subnet.private)
   subnet_id      = aws_subnet.private[count.index].id
   route_table_id = aws_route_table.private[0].id
 }
+
+# Define a security group allowing SSH and MongoDB traffic, with conditional logic for MongoDB access source.
 
 # Security Group for MongoDB VM
 resource "aws_security_group" "mongodb_sg" {
