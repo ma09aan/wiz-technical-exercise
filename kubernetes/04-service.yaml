@@ -1,20 +1,35 @@
 apiVersion: v1
-kind: Service
+
+# creating a Service, which lets other apps (or the internet) reach your application pods
+kind: 
 metadata:
   name: wizapp-service
   namespace: wizapp
+  
+  # Helps Kubernetes and users identify this Service by tagging it.
   labels:
-    app: wizapp
+    app: wizapp 
+  
+  
+  
   annotations:
     # Optional: Use AWS Load Balancer Controller annotations for specific features if ALB/NLB controller is installed.
     # For a basic LoadBalancer service type, these are not strictly needed.
     # service.beta.kubernetes.io/aws-load-balancer-type: "nlb" # or "alb" (requires AWS Load Balancer Controller)
     # service.beta.kubernetes.io/aws-load-balancer-internal: "false"
+
+# This will provision an AWS Classic Load Balancer by default, or NLB/ALB if controller is used. 
 spec:
-  type: LoadBalancer # This will provision an AWS Classic Load Balancer by default, or NLB/ALB if controller is used.
+  type: LoadBalancer 
+  
+  # This connects the Service to any Pods that have app: wizapp in their labels (like the ones created by your Deployment).
+  # It ensures the traffic goes to the right set of Pods
   selector:
-    app: wizapp # Must match labels in your Deployment's template
+    app: wizapp 
+
+   # External users connect via port 80 (standard HTTP).
+   # Inside the cluster, that traffic gets forwarded to port 3000 on the matching Pods (where your app is listening) 
   ports:
   - protocol: TCP
-    port: 80 # Port the Load Balancer listens on
-    targetPort: 3000 # Port your container (application) listens on
+    port: 80 
+    targetPort: 3000 
