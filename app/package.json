@@ -4,7 +4,7 @@
   "description": "Sample web application for Wiz Technical Exercise",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js", # npm start will run node server.js (starts your app).npm test just exits with an error — no real tests defined yet.
+    "start": "node server.js", # npm start will run node server.
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
