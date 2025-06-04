@@ -5,7 +5,7 @@ output "mongodb_ec2_public_ip" {
 
 output "s3_backup_bucket_name" {
   description = "Name of the S3 bucket for database backups."
-  value       = module.s3_backups.bucket_name_output # Ensure s3_backups module outputs this
+  value       = module.s3_backups.bucket_name_output # Ensure s3_backups module outputs thhis
 }
 
 output "eks_cluster_endpoint" {
