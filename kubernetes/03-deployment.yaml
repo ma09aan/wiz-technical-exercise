@@ -4,7 +4,7 @@ kind: Deployment  # Declares this resource is a Deployment (manages replicas of 
 # Assigns the name wizapp-deployment, places it in the wizapp namespace, and labels it with app: wizapp (used for selection and grouping)
 metadata: 
   name: wizapp-deployment
-  namespace: wizapp   #Places the Deployment in the 'wizapp' namespace.
+  namespace: wizapp  
   labels:
     app: wizapp
 
@@ -47,7 +47,6 @@ spec:
         
         
         # Injects the environment variable MONGODB_URI from a Kubernetes Secret named mongodb-secret
-        
       env:
         - name: MONGODB_URI
           valueFrom:
