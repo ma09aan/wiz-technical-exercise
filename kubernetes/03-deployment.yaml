@@ -1,8 +1,8 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: Deployment  # Declares this resource is a Deployment (manages replicas of Pods).
 metadata:
   name: wizapp-deployment
-  namespace: wizapp
+  namespace: wizapp   #Places the Deployment in the 'wizapp' namespace.
   labels:
     app: wizapp
 spec:
