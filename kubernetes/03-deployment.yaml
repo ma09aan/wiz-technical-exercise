@@ -25,12 +25,11 @@ spec:
    
     
     
-    # Starts a container inside each pod with the name wizapp-container.
-    
-    spec:
+      # Starts a container inside each pod with the name wizapp-container.
       # !! INTENTIONAL WEAKNESS: Uses 'default' ServiceAccount which is bound to cluster-admin via ClusterRoleBinding !!
       # serviceAccountName: default 
       # granted it cluster-admin rights, which means this app can do anything in your cluster — a major security risk in production.
+    spec:
       containers:
       - name: wizapp-container
        
