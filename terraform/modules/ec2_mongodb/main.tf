@@ -38,10 +38,13 @@ resource "aws_instance" "mongodb_server" {
   key_name = "id_rsa"
   associate_public_ip_address = true # Since it's in a public subnet for SSH access as per exercise
 
-  # User data to install outdated MongoDB, configure it, and set up backups
-  # Loads a user_data shell script with injected variables. Runs on first boot.
-  # Injected into the shell script via template placeholders (${} inside the script).
-  # These are used for MongoDB credentials, config path, S3 backup, and region.
+# Runs a shell script the first time the machine boots.
+
+  # This script installs MongoDB, sets up a database user, configures backups to S3, and more.
+  # This creates a virtual machine in AWS that installs and runs MongoDB. 
+  # It automatically sets everything up when it boots: username, password, configuration, and backup to S3. 
+  # If anything in the setup script changes later, Terraform will recreate the machine to keep it up to date.".
+  
   
 user_data = templatefile("${path.module}/user_data/install_mongodb.sh", { 
 
