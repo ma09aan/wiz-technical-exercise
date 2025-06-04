@@ -126,6 +126,7 @@ resource "aws_security_group" "mongodb_sg" {
     from_port        = 27017 # Default MongoDB port
     to_port          = 27017
     protocol         = "tcp"
+   
     # This should be updated to use the EKS worker node security group ID.
     # For now, allowing from the entire VPC for simplicity, then refine.
     # Or, if k8s_worker_sg_id is passed as a variable to this module:
