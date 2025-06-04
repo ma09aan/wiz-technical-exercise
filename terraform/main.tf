@@ -105,9 +105,10 @@ module "s3_backups" {
 # Terraform tries to build everything in parallel as long as it thinks it has what it needs
 # enforce order to say do not start creating the ec2_mongodb module until all of these modules have been successfully created
 # Ensure the VPC, subnets, and security groups exist.
-# Ensure IAM instance profiles and permissions are ready.
-# Ensure the S3 bucket for database backups is available
-# Ensure Kubernetes cluster exists, likely for interconnectivity (e.g. allowing pods to reach MongoDB).
+# Ensure IAM instance profiles and permissions are ready.Without this, EC2 can't securely interact with other AWS services (like S3)
+# Ensure the S3 bucket for database backups is available. Backup functionality in MongoDB will fail without a target S3 bucket
+# Ensure EKS exists, likely for interconnectivity (e.g. allowing pods to reach MongoDB). Your apps running in Kubernetes (EKS) likely need to connect to MongoDB.
+# The EC2 security group must allow inbound traffic from EKS nodes..
 
 
 
@@ -130,13 +131,21 @@ module "ec2_mongodb" {
   project_name        = var.project_name
   aws_region          = var.aws_region
   mongodb_ami_id      = var.mongodb_ami_id # Specify an outdated AMI
-  instance_type       = var.mongodb_instance_type
+  instance_type       = var.mongodb_instance_type # Assigns an IAM instance profile to the EC2 instance. This allows the instance to access AWS services like S3.
   subnet_id           = module.vpc.public_subnets_ids_output[0] # Ensure VPC module outputs this
-  vpc_security_group_ids = [module.vpc.mongodb_sg_id_output] # Ensure VPC module outputs this
+  vpc_security_group_ids = [module.vpc.mongodb_sg_id_output] # Assigns a security group to the EC2 instance, usually allowing traffic like SSH or DB connections
   iam_instance_profile_name = module.iam_roles.ec2_mongodb_instance_profile_name_output # Ensure IAM module outputs this
   s3_backup_bucket_name = module.s3_backups.bucket_name_output # Ensure S3 module outputs this
   db_username         = var.db_username
   db_password         = var.db_password # Pass as sensitive variable
+
+
+
+
+
+
+
+
   # Pass the EKS worker node security group ID to allow DB connections
   # This requires careful handling of dependencies or using data sources.
   # For simplicity, the VPC module's MongoDB SG might initially allow broader access from private subnets,
