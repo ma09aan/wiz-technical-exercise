@@ -1,3 +1,7 @@
+
+#This ensures everyone uses the same state file — preventing drift and duplication.
+
+
 terraform {
   backend "s3" {
     bucket         = "s3-for-state-wiz" # REPLACE THIS
