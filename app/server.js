@@ -1,6 +1,6 @@
 // Basic Express server example
 // If you use the 'tasky' app from [https://github.com/jeffthorne/tasky](https://github.com/jeffthorne/tasky)
-// you would use its server.js or adapt it.
+// you would use its server.js or adapt it
 
 const express = require('express');
 const mongoose = require('mongoose');
