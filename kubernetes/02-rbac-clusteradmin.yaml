@@ -1,4 +1,6 @@
-# !! INTENTIONAL WEAKNESS: Granting cluster-admin to the default service account in wizapp namespace !!
+# !! INTENTIONAL WEAKNESS: Granting cluster-admin to the default service account in wizapp namespace. 
+# Granting the default service account cluster-admin access is very risky in production.
+It means any pod running in that namespace can now control the entire cluster
 # This is a simplified way to achieve the "container with cluster-admin privileges" requirement.
 # A more targeted approach would be to create a specific ServiceAccount for your deployment
 # and bind that ServiceAccount to the cluster-admin ClusterRole.
