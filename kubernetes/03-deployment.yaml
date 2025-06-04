@@ -1,36 +1,64 @@
 apiVersion: apps/v1
 kind: Deployment  # Declares this resource is a Deployment (manages replicas of Pods).
-metadata:
+
+# Assigns the name wizapp-deployment, places it in the wizapp namespace, and labels it with app: wizapp (used for selection and grouping)
+metadata: 
   name: wizapp-deployment
   namespace: wizapp   #Places the Deployment in the 'wizapp' namespace.
   labels:
     app: wizapp
+
+
+# Tells Kubernetes to run 2 copies (pods) of the application at all times.
 spec:
   replicas: 2
   selector:
     matchLabels:
       app: wizapp
+  
+  
+  # Defines the labels the actual Pods will have — this is what ties them to the Deployment and Services
   template:
     metadata:
       labels:
         app: wizapp
+   
+    
+    
+    # Starts a container inside each pod with the name wizapp-container.
+    
     spec:
       # !! INTENTIONAL WEAKNESS: Uses 'default' ServiceAccount which is bound to cluster-admin via ClusterRoleBinding !!
       # serviceAccountName: default 
+      # granted it cluster-admin rights, which means this app can do anything in your cluster — a major security risk in production.
       containers:
       - name: wizapp-container
-        # This placeholder will be replaced by the CI/CD pipeline with the actual ECR image URI.
+       
+        
+        
+        # Placeholder for the Docker image — your CI/CD pipeline will replace this with the actual image URI (e.g., from ECR).
         # Example after replacement: image: [123456789012.dkr.ecr.us-east-1.amazonaws.com/wizexercise-app-repo:abcdef1](https://123456789012.dkr.ecr.us-east-1.amazonaws.com/wizexercise-app-repo:abcdef1)
+        
         image: DYNAMICALLY_REPLACED_BY_CI_CD_PIPELINE # This exact string is targeted by sed in CI/CD
+       
+        
+        #Tells Kubernetes the app inside the container listens on port 3000.
         ports:
-        - containerPort: 3000 # Port your application listens on (must match app/Dockerfile EXPOSE and app/server.js port)
-        env:
+        - containerPort: 3000 
+        
+        
+        # Injects the environment variable MONGODB_URI from a Kubernetes Secret named mongodb-secret
+        
+      env:
         - name: MONGODB_URI
           valueFrom:
             secretKeyRef:
               name: mongodb-secret
               key: MONGODB_URI
-        # Add readiness and liveness probes for production-grade deployments
+
+
+
+        # Tells Kubernetes when the app is ready to receive traffic. It waits 20 seconds, then checks / every 10 seconds. If it fails 3 times, it marks the pod as not ready.
         readinessProbe:
           httpGet:
             path: / # Your app's root or a specific health check endpoint
@@ -38,6 +66,9 @@ spec:
           initialDelaySeconds: 20 # Give some time for the app to start
           periodSeconds: 10
           failureThreshold: 3
+
+        
+        # Tells Kubernetes whether the app is still healthy and running. If it fails 3 times after 45 seconds, Kubernetes will kill and restart the pod.
         livenessProbe:
           httpGet:
             path: / # Your app's root or a specific health check endpoint
