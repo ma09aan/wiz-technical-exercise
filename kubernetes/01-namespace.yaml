@@ -1,3 +1,6 @@
+# It creates a namespace named wizapp in your Kubernetes cluster.
+# Namespaces help organize resources, isolate teams or applications, and apply policies like resource limits or RBAC (role-based access control)
+
 apiVersion: v1
 kind: Namespace
 metadata:
