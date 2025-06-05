@@ -1,3 +1,6 @@
+# Dockerfile that defines how to build a container image for my Node.js app.
+
+
 # Use an appropriate base image (e.g., Node.js)
 FROM node:18-alpine As builder
 
