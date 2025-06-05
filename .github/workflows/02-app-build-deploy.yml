@@ -1,12 +1,3 @@
-# Push to main
-# Build Docker image
-# Push to ECR
-# Update K8s manifest with image URI
-# Apply manifests
-# Rollout to EKS cluster
-# Print Load Balancer URL
-
-
 name: 02 - Build and Deploy Application to EKS
 
 on:
@@ -29,7 +20,7 @@ env:
 
 jobs:
   build-and-push-image:
-    name: Build and Push Docker Image # Build Docker image and push it to Amazon ECR
+    name: Build and Push Docker Image
     runs-on: ubuntu-latest
     permissions: # Required for OIDC if you were to use it, good practice
       id-token: write
@@ -102,7 +93,7 @@ jobs:
         echo "Value of 'steps.build-image.outputs.image' is: '${{ steps.build-image.outputs.image }}'"
 
   deploy-to-eks:
-    name: Deploy to EKS # Deploy the new image to the Kubernetes cluster in EKS
+    name: Deploy to EKS
     runs-on: ubuntu-latest
     needs: build-and-push-image # Depends on the image being built and URI being outputted
 
