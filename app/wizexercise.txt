@@ -1,2 +1,4 @@
-This is the Wiz Exercise marker file. Hurray!
+This is the Wiz Exercise marker file. Success!
+
+
 
