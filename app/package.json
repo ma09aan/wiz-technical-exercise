@@ -1,16 +1,13 @@
-{
-  "name": "wiz-exercise-app",
-  "version": "1.0.0",
-  "description": "Sample web application for Wiz Technical Exercise",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "dependencies": {
-    "express": "^4.17.1",
-    "mongoose": "^6.0.12"
-  },
-  "author": "",
-  "license": "ISC"
-}
+	
+name	"wiz-exercise-app"
+version	"1.0.0"
+description	"Sample web application for Wiz Technical Exercise"
+main	"server.js"
+scripts	
+start	"node server.js"
+test	'echo "Error: no test specified" && exit 1'
+dependencies	
+express	"^4.17.1"
+mongoose	"^6.0.12"
+author	""
+license	"ISC"
