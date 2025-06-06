@@ -5,6 +5,7 @@
 # A more targeted approach would be to create a specific ServiceAccount for your deployment
 # and bind that ServiceAccount to the cluster-admin ClusterRole.
 
+
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
