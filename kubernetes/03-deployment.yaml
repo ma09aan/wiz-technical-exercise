@@ -16,14 +16,12 @@ spec:
         app: wizapp
     spec:
       # !! INTENTIONAL WEAKNESS: Uses 'default' ServiceAccount which is bound to cluster-admin via ClusterRoleBinding !!
-      # serviceAccountName: default # Explicitly stating default, or remove to use namespace default SA
+      # serviceAccountName: default 
       containers:
       - name: wizapp-container
-        # Replace with your ECR image URI. This will be updated by CI/CD.
-        # Example placeholder: [123456789012.dkr.ecr.us-east-1.amazonaws.com/wizexercise-app-repo:latest](https://123456789012.dkr.ecr.us-east-1.amazonaws.com/wizexercise-app-repo:latest)
-        #image: YOUR_AWS_ACCOUNT_ID.dkr.ecr.YOUR_AWS_[REGION.amazonaws.com/YOUR_ECR_REPO_NAME:latest](https://REGION.amazonaws.com/YOUR_ECR_REPO_NAME:latest) # Placeholder
-        image: 084375569241.dkr.ecr.us-east-1.amazonaws.com/wizexercise-app-repo:latest
-        imagePullPolicy: Always
+        # This placeholder will be replaced by the CI/CD pipeline with the actual ECR image URI.
+        # Example after replacement: image: [123456789012.dkr.ecr.us-east-1.amazonaws.com/wizexercise-app-repo:abcdef1](https://123456789012.dkr.ecr.us-east-1.amazonaws.com/wizexercise-app-repo:abcdef1)
+        image: DYNAMICALLY_REPLACED_BY_CI_CD_PIPELINE # This exact string is targeted by sed in CI/CD
         ports:
         - containerPort: 3000 # Port your application listens on (must match app/Dockerfile EXPOSE and app/server.js port)
         env:
